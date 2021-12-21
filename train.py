@@ -46,6 +46,7 @@ from utils.plots import plot_images, plot_labels, plot_results, plot_evolution
 from utils.torch_utils import ModelEMA, select_device, intersect_dicts, torch_distributed_zero_first, de_parallel
 from utils.wandb_logging.wandb_utils import WandbLogger, check_wandb_resume
 from utils.metrics import fitness
+from pruning import *
 
 logger = logging.getLogger(__name__)
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
@@ -159,6 +160,18 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             logger.info('Transferred %g/%g items from %s' % (len(state_dict), len(model.state_dict()), weights))  # report
         else:
             model = Model(cfg, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
+    
+    CSP_list = set()
+    for name, item in model.named_parameters():
+        layer_num = int(name.split('.')[1])
+        if layer_num <= 9:
+            backbone_cnt += item.numel()
+        else:
+            head_cnt += item.numel()
+        if 'm.' in name:
+            CSP_list.add(layer_num)
+    
+    CSP_list = list(CSP_list)
 
     with torch_distributed_zero_first(RANK):
         check_dataset(data_dict)  # check
@@ -353,6 +366,14 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             pbar = tqdm(pbar, total=nb)  # progress bar
         optimizer.zero_grad()
         for i, (imgs, targets, paths, _) in pbar:  # batch -------------------------------------------------------------
+            if (i+1)%opt.prune_freq==0 and (epoch+1) <= (epochs-20) and opt.prune:
+                mask_min = math.exp(-(epoch+1)*9/(epochs-20))
+                if (epoch+1) >= (epochs-20):
+                    mask_min = 0
+                target_sparsity = opt.prune_rate - opt.prune_rate * (1 - (epoch+1-start_epoch) / (epochs-20))**3
+                filter_mask = get_yolov5_mask(model, target_sparsity, mask_min, CSP_list, opt)
+                yolov5_prune(model, filter_mask, CSP_list, opt)
+
             ni = i + nb * epoch  # number integrated batches (since train start)
             imgs = imgs.to(device, non_blocking=True).float() / 255.0  # uint8 to float32, 0-255 to 0.0-1.0
 
@@ -578,6 +599,7 @@ def parse_opt(known=False):
     parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter, do not modify')
     parser.add_argument('--distill', action="store_true", help="activate distillation")
     parser.add_argument('--prune', action="store_true", help="activate pruning")
+    parser.add_argument('--prune-type', type=str, help="type of pruning : {static, dpf, gumbel}")
     parser.add_argument('--prune-rate', type=float, help="pruning ratio")
     parser.add_argument('--prune-freq', type=int, help="frequency of update mask")
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
