@@ -217,7 +217,7 @@ class Model(nn.Module):
             s_feats.append(x_)
 
         # temperature factor & spatial/channel wise attention weight factor
-        t = 4
+        t = 0.1
         s_ratio = 1.0
 
         #   for channel attention temperature
@@ -407,7 +407,9 @@ class Model(nn.Module):
             tcls.append(c)  # class
 
         return tcls, tbox, indices, anch
-
+    
+    
+    ## CVPR PART ##
     def make_mask(self, pred, targets):
         device = targets.device
         _, tbox, indices, anchors = self.build_targets(pred, targets)  # targets

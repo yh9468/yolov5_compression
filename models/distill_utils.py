@@ -98,8 +98,6 @@ class NonLocalBlockND(nn.Module):
         z = W_y + x
 
         return z
-
-
     
 ## VIT part ###
 def pair(t):
