@@ -366,13 +366,14 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             pbar = tqdm(pbar, total=nb)  # progress bar
         optimizer.zero_grad()
         for i, (imgs, targets, paths, _) in pbar:  # batch -------------------------------------------------------------
-            if (i+1)%opt.prune_freq==0 and (epoch+1) <= (epochs-20) and opt.prune:
-                mask_min = math.exp(-(epoch+1)*9/(epochs-20))
-                if (epoch+1) >= (epochs-20):
-                    mask_min = 0
-                target_sparsity = opt.prune_rate - opt.prune_rate * (1 - (epoch+1-start_epoch) / (epochs-20))**3
-                filter_mask = get_yolov5_mask(model, target_sparsity, mask_min, CSP_list, opt)
-                yolov5_prune(model, filter_mask, CSP_list, opt)
+            if opt.prune_type in ['static', 'dpf']:
+                if (i+1)%opt.prune_freq==0 and (epoch+1) <= (epochs-20) and opt.prune:
+                    mask_min = math.exp(-(epoch+1)*9/(epochs-20))
+                    if (epoch+1) >= (epochs-20):
+                        mask_min = 0
+                    target_sparsity = opt.prune_rate - opt.prune_rate * (1 - (epoch+1-start_epoch) / (epochs-20))**3
+                    filter_mask = get_yolov5_mask(model, target_sparsity, mask_min, CSP_list, opt)
+                    yolov5_prune(model, filter_mask, CSP_list, opt)
 
             ni = i + nb * epoch  # number integrated batches (since train start)
             imgs = imgs.to(device, non_blocking=True).float() / 255.0  # uint8 to float32, 0-255 to 0.0-1.0
@@ -417,6 +418,20 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                     loss *= WORLD_SIZE  # gradient averaged between devices in DDP mode
                 if opt.quad:
                     loss *= 4.
+
+                if opt.prune and opt.prune_type == 'gumbel':
+                    if epoch == opt.epochs-20:
+                        for name, param in model.module.named_parameters():
+                            if 'logit' in name:
+                                param.requires_grad = False
+                    elif epoch < opt.epochs-20:
+                        prune_term = 0
+                        total = 0
+                        for name, param in model.module.named_parameters():
+                            if 'logit' in name:
+                                total += param.numel()
+                                prune_term += differentiable_mask(param).sum()
+                        loss += 1e-4*(total*(1-args.prune_rate) - prune_term).abs()
 
             # Backward
             scaler.scale(loss).backward()

@@ -68,6 +68,45 @@ class MaskBatchNorm2d(nn.BatchNorm2d):
         
         return out
 
+
+class MaskConv2dv2(nn.Conv2d):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
+                 padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'):
+        super(MaskConv2dv2, self).__init__(in_channels, out_channels, kernel_size, stride,
+                                     padding, dilation, groups, bias, padding_mode)
+        self.mask = Parameter(torch.ones(self.weight.size()), requires_grad=False)
+
+    def forward(self, input):
+        masked_weight = self.weight * self.mask
+        if self.bias is not None:
+            masked_bias = self.bias * self.mask[:,0,0,0]
+            if self.padding_mode != 'zeros':
+                return F.conv2d(F.pad(input, self._reversed_padding_repeated_twice, mode=self.padding_mode),
+                                masked_weight, masked_bias, self.stride,
+                                _pair(0), self.dilation, self.groups)
+            return F.conv2d(input, masked_weight, masked_bias, self.stride,
+                            self.padding, self.dilation, self.groups)
+        else:
+            return super(MaskConv2d, self)._conv_forward(input, masked_weight)
+
+
+class MaskBatchNorm2dv2(nn.BatchNorm2d):
+    def __init__(self, num_features, eps=1e-05, momentum=0.1,
+                affine=True, track_running_stats=True):
+        super(MaskBatchNorm2dv2, self).__init__(num_features, eps, momentum, affine, track_running_stats)
+        self.mask = Parameter(torch.ones(self.bias.size()), requires_grad=False)
+
+    def forward(self, input):
+        masked_weight = self.weight * self.mask)
+        masked_bias = self.bias * self.mask)
+        
+        out =  F.batch_norm(
+            input, self.running_mean, self.running_var, masked_weight, masked_bias,
+            self.training, self.momentum, self.eps)
+        
+        return out
+
+
 def autopad(k, p=None):  # kernel, padding
     # Pad to 'same'
     if p is None:
@@ -100,6 +139,15 @@ class MaskConv(Conv):
         super(MaskConv, self).__init__(c1, c2, k, s, p, g, act)
         self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=False)
         self.bn = MaskBatchNorm2d(c2)
+        self.act = nn.SiLU() if act is True else (act if isinstance(act, nn.Module) else nn.Identity())
+
+
+class MaskConvv2(Conv):
+    # Masked convolution
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
+        super(MaskConvv2, self).__init__(c1, c2, k, s, p, g, act)
+        self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p), groups=g, bias=False)
+        self.bn = MaskBatchNorm2dv2(c2)
         self.act = nn.SiLU() if act is True else (act if isinstance(act, nn.Module) else nn.Identity())
 
 
@@ -172,6 +220,16 @@ class MaskBottleneck(Bottleneck):
         self.add = shortcut and c1 == c2
 
 
+class MaskBottleneckv2(Bottleneck):
+    # Masked bottleneck
+    def __init__(self, c1, c2, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, shortcut, groups, expansion
+        super(MaskBottleneckv2, self).__init__(c1, c2, shortcut, g, e)
+        c_ = int(c2 * e)  # hidden channels
+        self.cv1 = MaskConvv2(c1, c_, 1, 1)
+        self.cv2 = MaskConvv2(c_, c2, 3, 1, g=g)
+        self.add = shortcut and c1 == c2
+
+
 class BottleneckCSP(nn.Module):
     # CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
@@ -205,6 +263,20 @@ class MaskBottleneckCSP(BottleneckCSP):
         self.m = nn.Sequential(*[MaskBottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
 
 
+class MaskBottleneckCSPv2(BottleneckCSP):
+    # CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
+    def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
+        super(MaskBottleneckCSPv2, self).__init__(c1, c2, n, shortcut, g, e)
+        c_ = int(c2 * e)  # hidden channels
+        self.cv1 = MaskConvv2(c1, c_, 1, 1)
+        self.cv2 = nn.Conv2d(c1, c_, 1, 1, bias=False)
+        self.cv3 = nn.Conv2d(c_, c_, 1, 1, bias=False)
+        self.cv4 = MaskConvv2(2 * c_, c2, 1, 1)
+        self.bn = MaskBatchNorm2d(2 * c_)  # applied to cat(cv2, cv3)
+        self.act = nn.LeakyReLU(0.1, inplace=True)
+        self.m = nn.Sequential(*[MaskBottleneckv2(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
+
+
 class C3(nn.Module):
     # CSP Bottleneck with 3 convolutions
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
@@ -222,13 +294,23 @@ class C3(nn.Module):
 
 class MaskC3(C3):
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
-        super(C3, self).__init__()
+        super(MaskC3, self).__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = MaskConv(c1, c_, 1, 1)
         self.cv2 = MaskConv(c1, c_, 1, 1)
         self.cv3 = MaskConv(2 * c_, c2, 1)  # act=FReLU(c2)
         self.m = nn.Sequential(*[MaskBottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
-        
+
+
+class MaskC3v2(C3):
+    def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
+        super(MaskC3v2, self).__init__()
+        c_ = int(c2 * e)  # hidden channels
+        self.cv1 = MaskConvv2(c1, c_, 1, 1)
+        self.cv2 = MaskConvv2(c1, c_, 1, 1)
+        self.cv3 = MaskConvv2(2 * c_, c2, 1)  # act=FReLU(c2)
+        self.m = nn.Sequential(*[MaskBottleneckv2(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
+
 
 class C3TR(C3):
     # C3 module with TransformerBlock()
@@ -262,6 +344,16 @@ class MaskSPP(SPP):
         self.m = nn.ModuleList([nn.MaxPool2d(kernel_size=x, stride=1, padding=x // 2) for x in k])
 
 
+class MaskSPPv2(SPP):
+    # Spatial pyramid pooling layer used in YOLOv3-SPP
+    def __init__(self, c1, c2, k=(5, 9, 13)):
+        super(MaskSPPv2, self).__init__(c1, c2, k)
+        c_ = c1 // 2  # hidden channels
+        self.cv1 = MaskConvv2(c1, c_, 1, 1)
+        self.cv2 = MaskConvv2(c_ * (len(k) + 1), c2, 1, 1)
+        self.m = nn.ModuleList([nn.MaxPool2d(kernel_size=x, stride=1, padding=x // 2) for x in k])
+
+
 class Focus(nn.Module):
     # Focus wh information into c-space
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
@@ -278,6 +370,12 @@ class MaskFocus(Focus):
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
         super(MaskFocus, self).__init__(c1, c2, k, s, p, g, act)
         self.conv = MaskConv(c1 * 4, c2, k, s, p, g, act)
+
+
+class MaskFocusv2(Focus):
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True):  # ch_in, ch_out, kernel, stride, padding, groups
+        super(MaskFocusv2, self).__init__(c1, c2, k, s, p, g, act)
+        self.conv = MaskConvv2(c1 * 4, c2, k, s, p, g, act)
 
 
 class Contract(nn.Module):

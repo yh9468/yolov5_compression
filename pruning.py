@@ -131,3 +131,8 @@ def yolov5_prune(model, filter_mask, CSP_list, args):
             item.data *= filter_mask[idx:idx+item.size(0)]
 
             idx += item.size(0)
+
+def differentiable_mask(logits):
+    y_soft = torch.sigmoid(logits)
+    y_hard = torch.ge(y_soft, 0.5).float()
+    return (y_hard - y_soft).detach() + y_soft
