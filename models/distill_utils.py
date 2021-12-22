@@ -168,6 +168,7 @@ class Transformer(nn.Module):
             x = ff(x) + x
         return x
 
+
 class ViT(nn.Module):
     def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, pool = 'cls', channels = 3, dim_head = 64, dropout = 0., emb_dropout = 0.):
         super().__init__()
