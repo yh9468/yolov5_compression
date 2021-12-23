@@ -526,15 +526,15 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
                 pass
 
         n = max(round(n * gd), 1) if n > 1 else n  # depth gain
-        if m in [Conv, MaskConv, MaskConvv2, GhostConv, Bottleneck, MaskBottleneck, MaskBottleneckv2, GhostBottleneck, 
-                SPP, MaskSPP, MaskSPPv2, DWConv, MixConv2d, Focus, MaskFocus, MaskFocusv2, CrossConv, 
-                BottleneckCSP, MaskBottleneckCSP, MaskBottleneckCSPv2, C3, MaskC3, MaskC3v2, C3TR]:
+        if m in [Conv, MaskConv, MaskConvv2, MaskConvv3, GhostConv, Bottleneck, MaskBottleneck, MaskBottleneckv2, MaskBottleneckv3, GhostBottleneck, 
+                SPP, MaskSPP, MaskSPPv2, MaskSPPv3, DWConv, MixConv2d, Focus, MaskFocus, MaskFocusv2, MaskFocusv3, CrossConv, 
+                BottleneckCSP, MaskBottleneckCSP, MaskBottleneckCSPv2, MaskBottleneckCSPv3, C3, MaskC3, MaskC3v2, MaskC3v3, C3TR]:
             c1, c2 = ch[f], args[0]
             if c2 != no:  # if not output
                 c2 = make_divisible(c2 * gw, 8)
 
             args = [c1, c2, *args[1:]]
-            if m in [BottleneckCSP, C3, C3TR, MaskBottleneckCSP, MaskC3, MaskBottleneckCSPv2, MaskC3v2]:
+            if m in [BottleneckCSP, C3, C3TR, MaskBottleneckCSP, MaskC3, MaskBottleneckCSPv2, MaskC3v2, MaskBottleneckCSPv3, MaskC3v3]:
                 args.insert(2, n)  # number of repeats
                 n = 1
         elif m is nn.BatchNorm2d:
