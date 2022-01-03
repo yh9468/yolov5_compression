@@ -1,6 +1,43 @@
 import torch
 import numpy as np
 
+def get_yolov5_unstr_mask(model, rate):
+    try:
+        net = model.module.state_dict()
+        parameters = model.module.named_parameters()
+    except:
+        net = model.state_dict()
+        parameters = model.named_parameters()
+    importance_all = None
+
+    for name, param in parameters:
+        if 'mask' not in name and len(param.size())==4:
+            importance = param.data.view(-1).abs()
+            if importance_all is None:
+                importance_all = importance.cpu().numpy()
+            else:
+                importance_all = np.append(importance_all, importance.cpu().numpy())
+
+    threshold = np.sort(importance_all)[int(len(importance_all) * rate)]
+    
+    return threshold
+
+
+def yolov5_unstr_prune(model, threshold):
+    try:
+        net = model.module.state_dict()
+        parameters = model.module.named_parameters()
+    except:
+        net = model.state_dict()
+        parameters = model.named_parameters()
+
+    for name, param in parameters:
+        if 'mask' not in name and len(param.size())==0:
+            mask_key = name.replace('weight', 'mask')
+            net[mask_key].data = torch.gt(param.data, threshold).float().cuda()
+    
+
+
 def get_yolov5_mask(model, rate, mask_min, CSP_list, args):
     try:
         net = model.module.state_dict()
