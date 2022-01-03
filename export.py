@@ -55,7 +55,7 @@ def run(weights='./yolov5s.pt',  # weights path
     if half:
         img, model = img.half(), model.half()  # to FP16
     model.train() if train else model.eval()  # training mode = no Detect() layer grid construction
-    for k, m in model.named_modules():
+    for _, m in model.named_modules():
         m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatibility
         if isinstance(m, Conv):  # assign export-friendly activations
             if isinstance(m.act, nn.Hardswish):
@@ -68,7 +68,7 @@ def run(weights='./yolov5s.pt',  # weights path
             # m.forward = m.forward_export  # assign forward (optional)
 
     for _ in range(2):
-        y = model(img)  # dry runs
+        _ = model(img)  # dry runs
     print(f"\n{colorstr('PyTorch:')} starting from {weights} ({file_size(weights):.1f} MB)")
 
     # TorchScript export -----------------------------------------------------------------------------------------------
