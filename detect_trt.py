@@ -25,7 +25,6 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized
 
 from PythonTRT import *
 
-
 @torch.no_grad()
 def run(weights='yolov5s.pt',  # model.pt path(s)
         engine='yolov5s.engine',  # model.engine path(s)
@@ -201,7 +200,7 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
         print(f"Results saved to {save_dir}{s}")
 
     if update:
-        strip_optimizer(weights)  # update model (to fix SourceChangeWarning)
+        strip_optimizer(weights)
 
     print(f'Done. ({time.time() - t0:.3f}s)')
 
