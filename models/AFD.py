@@ -3,9 +3,7 @@
 # Apache License v2.0
 
 import torch.nn as nn
-import torch.nn.functional as F
 import torch
-import numpy as np
 from mmdet.models.utils import build_positional_encoding
 
 
