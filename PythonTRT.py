@@ -46,7 +46,6 @@ def allocate_buffers(engine):
             outputs.append(HostDeviceMem(host_mem, device_mem))
     return inputs, outputs, bindings, stream
 
-
 # This function is generalized for multiple inputs/outputs.
 # inputs and outputs are expected to be lists of HostDeviceMem objects.
 def do_inference(context, bindings, inputs, outputs, stream, batch_size=1, return_host=True):
@@ -66,7 +65,6 @@ def do_inference(context, bindings, inputs, outputs, stream, batch_size=1, retur
     else:
         return outputs
 
-
 # This function is generalized for multiple inputs/outputs for full dimension networks.
 # inputs and outputs are expected to be lists of HostDeviceMem objects.
 def do_inference_v2(context, bindings, inputs, outputs, stream):
@@ -80,7 +78,6 @@ def do_inference_v2(context, bindings, inputs, outputs, stream):
     stream.synchronize()
     # Return only the host outputs.
     return [out.host for out in outputs]
-
 
 # This class is generalized for simple run of trt models by containing initialization and post-process.
 TRT_LOGGER = trt.Logger()
