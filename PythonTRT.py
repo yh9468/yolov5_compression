@@ -20,7 +20,6 @@ class HostDeviceMem(object):
     def __repr__(self):
         return self.__str__()
 
-
 # Allocates all buffers required for an engine, i.e. host/device inputs/outputs.
 def allocate_buffers(engine):
     inputs = []
