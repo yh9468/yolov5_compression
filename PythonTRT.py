@@ -7,7 +7,6 @@ import pycuda.autoinit
 # TensorRT
 import tensorrt as trt
 
-
 # Simple helper data class that's a little nicer to use than a 2-tuple.
 class HostDeviceMem(object):
     def __init__(self, host_mem, device_mem):
