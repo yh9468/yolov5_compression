@@ -1,6 +1,12 @@
 import os
 import argparse
 import numpy as np
+
+# import packages
+import torch
+# utils
+from utils.torch_utils import time_synchronized
+
 # PyCUDA
 import pycuda.driver as cuda
 import pycuda.autoinit
@@ -113,7 +119,6 @@ class TRTModel(object):
         outputs = do_inference(self.context,
                                self.bindings, self.inputs, self.outputs, self.stream,
                                self.batch_size, self.return_host)
-
         # do post process
         outputs = self.postprocess(outputs)
 
@@ -123,10 +128,6 @@ class TRTModel(object):
         return outputs
 
 
-# import packages
-import torch
-# utils
-from utils.torch_utils import time_synchronized
 
 class TRTYOLOv5(TRTModel):
     def __init__(self, engine_path, batch_size, imgH, imgW, device='cuda:0'):
@@ -147,7 +148,6 @@ class TRTYOLOv5(TRTModel):
             output = torch.zeros(outH.shape, device=self.device).reshape((self.batch_size, -1, 85))
             cuda.memcpy_dtod(output.data_ptr(), outD, byte_size)
         return output
-
 
 # test an engine file
 if __name__ == '__main__':
