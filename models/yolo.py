@@ -219,11 +219,6 @@ class Model(nn.Module):
 
         # temperature factor & spatial/channel wise attention weight factor
         t = 0.1
-        s_ratio = 1.0
-
-        #   for channel attention temperature
-        c_t = 0.1
-        c_s_ratio = 1.0
 
         # change the inference of yolo for using distillation
         if t_feats is not None:
