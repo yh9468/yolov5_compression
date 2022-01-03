@@ -780,9 +780,7 @@ def apply_classifier(x, model, img, im0):
 
             pred_cls2 = model(torch.Tensor(ims).to(d.device)).argmax(1)  # classifier prediction
             x[i] = x[i][pred_cls1 == pred_cls2]  # retain matching class detections
-
     return x
-
 
 def save_one_box(xyxy, im, file='image.jpg', gain=1.02, pad=10, square=False, BGR=False, save=True):
     # Save image crop as {file} with crop size multiple {gain} and {pad} pixels. Save and/or return crop
@@ -797,7 +795,6 @@ def save_one_box(xyxy, im, file='image.jpg', gain=1.02, pad=10, square=False, BG
     if save:
         cv2.imwrite(str(increment_path(file, mkdir=True).with_suffix('.jpg')), crop)
     return crop
-
 
 def increment_path(path, exist_ok=False, sep='', mkdir=False):
     # Increment file or directory path, i.e. runs/exp --> runs/exp{sep}2, runs/exp{sep}3, ... etc.
